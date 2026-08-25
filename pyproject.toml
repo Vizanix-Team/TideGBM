@@ -72,5 +72,9 @@ test-requires = ["pytest", "numpy", "pandas", "scikit-learn"]
 test-command = "python -m pytest {project}/tests -q -o pythonpath="
 
 [tool.cibuildwheel.macos]
-before-all = "brew install libomp"
+before-all = "export HOMEBREW_NO_REQUIRE_TAP_TRUST=1 && brew install libomp"
+repair-wheel-command = "bash {project}/scripts/repair_macos_wheel.sh {wheel} {dest_dir} {delocate_archs}"
+
+[tool.cibuildwheel.macos.environment]
+MACOSX_DEPLOYMENT_TARGET = "11.0"
 

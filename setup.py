@@ -40,7 +40,11 @@ elif sys.platform == "darwin":
             "(cibuildwheel sets this via CIBW_BEFORE_ALL_MACOS)."
         )
     compile_args += ["-Xpreprocessor", "-fopenmp", f"-I{libomp}/include"]
-    link_args += [f"-L{libomp}/lib", "-lomp"]
+    link_args += [
+        f"-L{libomp}/lib",
+        "-lomp",
+        "-Wl,-rpath,@loader_path/.dylibs",
+    ]
 else:
     compile_args = ["-O3", "-std=c++17", "-fvisibility=hidden", "-ftree-vectorize", "-fno-math-errno"]
     link_args = []
