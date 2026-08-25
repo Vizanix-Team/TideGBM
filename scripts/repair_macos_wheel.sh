@@ -33,10 +33,10 @@ while IFS= read -r old; do
   install_name_tool -change "$old" "@loader_path/.dylibs/libomp.dylib" "$core"
 done < <(otool -L "$core" | awk '/libomp/{print $1}')
 
-patched="${tmp}/patched-$(basename "$wheel")"
+patched="$(mktemp "${TMPDIR:-/tmp}/tidegbm-wheel.XXXXXX.whl")"
 (
   cd "$tmp"
-  zip -q -r "$patched" .
+  zip -q -r "$patched" tidegbm "tidegbm-"*.dist-info
 )
 
 export REPAIR_LIBRARY_PATH="${libomp_lib}"
