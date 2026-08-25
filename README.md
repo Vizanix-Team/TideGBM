@@ -4,10 +4,10 @@
 
 **Temporal Ordered Gradient Boosting for panel & market data**
 
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![CI](https://github.com/Vizanix/TideGBM/actions/workflows/ci.yml/badge.svg)](https://github.com/Vizanix/TideGBM/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/tidegbm.svg)](https://pypi.org/project/tidegbm/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/version-0.4.0-green.svg)](CHANGELOG.md)
-[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-lightgrey.svg)](.github/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 *C++ histogram GBDT · Python sklearn API · TORB time/panel inductive bias*
 
@@ -156,7 +156,7 @@ flowchart LR
 | Document | Contents |
 |---|---|
 | [**`docs/API.md`**](docs/API.md) | **Python API reference** (estimators, fit params, CV, lint) |
-| [`docs/QUICKSTART.md`](docs/QUICKSTART.md) | Install & first model |
+| [`examples/quant_walkthrough.ipynb`](examples/quant_walkthrough.ipynb) | Jupyter walk-through for quants |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Algorithm design & TORB RFC |
 | [`docs/TIDEBENCH.md`](docs/TIDEBENCH.md) | Benchmark protocol & quality search |
 | [`docs/LEAKAGE.md`](docs/LEAKAGE.md) | Leakage anti-patterns |

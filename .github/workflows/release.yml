@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  github-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve release notes
+        id: notes
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          FILE="docs/releases/v${TAG}.md"
+          if [ -f "$FILE" ]; then
+            echo "body_path=$FILE" >> "$GITHUB_OUTPUT"
+          else
+            echo "body_path=CHANGELOG.md" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: TideGBM ${{ github.ref_name }}
+          body_path: ${{ steps.notes.outputs.body_path }}
+          draft: false
+          prerelease: false

@@ -22,9 +22,12 @@ sources = [
     "cpp/src/bindings.cpp",
 ]
 
-compile_args = ["-O3", "-std=c++17", "-fvisibility=hidden", "-ftree-vectorize", "-fno-math-errno"]
-link_args = []
-if os.name != "nt":
+if sys.platform == "win32":
+    compile_args = ["/O2", "/std:c++17", "/EHsc", "/openmp"]
+    link_args = []
+else:
+    compile_args = ["-O3", "-std=c++17", "-fvisibility=hidden", "-ftree-vectorize", "-fno-math-errno"]
+    link_args = []
     compile_args += ["-fopenmp"]
     link_args += ["-fopenmp"]
 if CUDA:

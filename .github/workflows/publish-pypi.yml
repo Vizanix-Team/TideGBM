@@ -6,7 +6,6 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write   # OIDC trusted publishing (optional)
   contents: read
 
 jobs:
@@ -17,10 +16,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install build deps
-        run: pip install cibuildwheel
-      - name: Build wheels
-        run: python -m cibuildwheel --output-dir wheelhouse
+      - run: pip install cibuildwheel
+      - run: python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_BUILD: "cp310-* cp311-* cp312-*"
           CIBW_SKIP: "pp* *-win32 *-manylinux_i686 *-musllinux*"
@@ -39,10 +36,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install build deps
-        run: pip install cibuildwheel
-      - name: Build wheels
-        run: python -m cibuildwheel --output-dir wheelhouse
+      - run: pip install cibuildwheel
+      - run: python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_BUILD: "cp310-* cp311-* cp312-*"
           CIBW_SKIP: "pp* *-win32 *-manylinux_i686 *-musllinux*"
@@ -52,6 +47,26 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-macos
+          path: wheelhouse/*.whl
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install cibuildwheel
+      - run: python -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_BUILD: "cp310-* cp311-* cp312-*"
+          CIBW_SKIP: "pp* *-win32 *-manylinux_i686 *-musllinux*"
+          CIBW_BEFORE_BUILD: "pip install pybind11"
+          CIBW_TEST_REQUIRES: "pytest numpy pandas scikit-learn"
+          CIBW_TEST_COMMAND: "pytest {project}/tests -q"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows
           path: wheelhouse/*.whl
 
   build-sdist:
@@ -69,7 +84,7 @@ jobs:
           path: dist/*.tar.gz
 
   publish:
-    needs: [build-linux, build-macos, build-sdist]
+    needs: [build-linux, build-macos, build-windows, build-sdist]
     runs-on: ubuntu-latest
     environment: pypi
     steps:
@@ -77,8 +92,7 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-      - name: List artifacts
-        run: find dist -type f
+      - run: find dist -type f
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}

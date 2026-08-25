@@ -6,3 +6,4 @@ recursive-include cpp/src *
 include cpp/CMakeLists.txt
 recursive-include docs *.md
 recursive-include examples *.py
+recursive-include examples *.ipynb
