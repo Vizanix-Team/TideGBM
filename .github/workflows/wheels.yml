@@ -22,6 +22,8 @@ jobs:
         run: pip install cibuildwheel
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_REPAIR_WHEEL_COMMAND_MACOS: 'bash "{project}/scripts/repair_macos_wheel.sh" "{wheel}" "{dest_dir}" "{delocate_archs}"'
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.os }}

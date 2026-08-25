@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -45,6 +46,9 @@ elif sys.platform == "darwin":
         "-lomp",
         "-Wl,-rpath,@loader_path/.dylibs",
     ]
+    if platform.machine() == "arm64":
+        compile_args += ["-arch", "arm64"]
+        link_args += ["-arch", "arm64"]
 else:
     compile_args = ["-O3", "-std=c++17", "-fvisibility=hidden", "-ftree-vectorize", "-fno-math-errno"]
     link_args = []
