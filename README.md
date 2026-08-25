@@ -1,63 +1,266 @@
+<div align="center">
+
 # TideGBM
 
-Temporal ordered gradient boosting. **C++ core**, Python API.
+**Temporal Ordered Gradient Boosting for panel & market data**
 
-You bring `X` and `y`. TideGBM does not compute indicators. It treats **time and panel** as first-class (TORB residuals, purge/embargo, leak lint).
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Version](https://img.shields.io/badge/version-0.4.0-green.svg)](CHANGELOG.md)
+[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-lightgrey.svg)](.github/workflows/ci.yml)
+
+*C++ histogram GBDT · Python sklearn API · TORB time/panel inductive bias*
+
+[Installation](#installation) · [Quick start](#quick-start) · [Benchmarks](#benchmarks) · [Documentation](#documentation) · [Русский](#русский)
+
+</div>
+
+---
+
+## Overview
+
+**TideGBM** is a production-oriented gradient boosting library built for **time-indexed** and **cross-sectional panel** tables — the kind of data you get in quantitative finance, demand forecasting, and multi-entity analytics.
+
+You bring `X` and `y`. TideGBM does **not** compute indicators or alpha factors. Instead, it treats **time order**, **entity structure**, and **purged evaluation** as first-class concerns:
+
+| Capability | What it means |
+|---|---|
+| **TORB** | Temporal ordered residual boosting — causal leaf residuals and structure that respect the arrow of time |
+| **Purge / embargo** | Walk-forward splits with horizon-aware gaps to prevent label leakage |
+| **Leak lint** | Strict mode refuses features that peek into the future |
+| **Pairwise objective** | Within-date LambdaMART-style ranking for cross-sectional IC |
+| **Histogram engine** | Column-major C++17 core with OpenMP; optional CUDA histograms |
+
+This is **not** “better than neural nets.” The target is a **stronger GBDT** for tabular time/panel problems under honest, purged evaluation — not SOTA claims or desk alpha.
+
+---
+
+## Quick start
 
 ```python
 from tidegbm import TideRegressor
 
-model = TideRegressor(horizon=1, n_estimators=200)
-model.fit(X, y, timestamp="ts", entity="symbol")
+model = TideRegressor(
+    horizon=1,
+    n_estimators=200,
+    max_depth=6,
+    objective="pairwise",   # cross-sectional ranking / IC
+)
+model.fit(X_train, y_train, timestamp="ts", entity="symbol")
 pred = model.predict(X_live)
 model.save_model("alpha.tgbm")
 ```
 
-v0.4: column-major histograms, L1 / GOSS (auto at 250k rows), frequency categorical bins, optional ONNX protobuf (`tidegbm[onnx]`), cibuildwheel + CUDA wheel workflow.
+For **level regression** (R², absolute fit), use `objective="mse"` or `objective="auto"`.
 
-This is not “better than neural nets.” Target is a stronger GBDT for time/panel tables under purged evaluation. Do not call it SOTA. On the public 30-name stand (`benchmarks/markets.py --horizons 1,3,5,10`, depth 6, date-demeaned labels) TideGBM with `objective="pairwise"` beats LightGBM mean IC on all four horizons; use MSE when you care about levels, not ranks. LightGBM is still faster. SHAP-style values are Saabas path attributions (additive), not Independent TreeSHAP. Default wheels are CPU; `device="gpu"` raises unless the wheel was built with `TIDEGBM_CUDA=1`.
+---
 
-## Install
+## Installation
 
 ```bash
+git clone https://github.com/Vizanix/TideGBM.git
+cd TideGBM
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
 ```
 
-Requires a C++17 compiler and OpenMP (`g++`). Optional: `pip install -e ".[onnx]"` for `to_onnx()`, `".[bench]"` for LightGBM + CatBoost.
+**Requirements:** C++17 compiler, OpenMP (`g++` on Linux).
+
+| Extra | Purpose |
+|---|---|
+| `pip install -e ".[onnx]"` | ONNX export (`to_onnx()`) |
+| `pip install -e ".[bench]"` | LightGBM + CatBoost benchmarks |
+| `TIDEGBM_CUDA=1 bash scripts/build_gpu_wheel.sh` | GPU histogram wheel (needs `nvcc`) |
+
+Default wheels are **CPU-only**; `device="gpu"` raises unless built with CUDA.
+
+---
+
+## Benchmarks
+
+Public stand: **30 liquid names** (Yahoo daily bars), purged expanding walk-forward, labels **demeaned within date** for IC alignment.
 
 ```bash
-python benchmarks/markets.py --quick    # 8 public names, purged WF
-TIDEGBM_CUDA=1 bash scripts/build_gpu_wheel.sh   # needs nvcc, not a GPU
+pip install -e ".[bench]"
+python benchmarks/markets.py --horizons 1,3,5,10
 ```
 
-Scale smoke: `python benchmarks/bench_scale.py`.
+**Snapshot (2026-08-25)** — 80 trees, depth 6, lr 0.08, 3 folds:
 
-## Defaults that match production
+| Model | h=1 | h=3 | h=5 | h=10 | **Mean IC** |
+|---|---:|---:|---:|---:|---:|
+| **TideGBM pairwise** | **0.026** | **0.020** | **0.050** | 0.027 | **0.031** |
+| TideGBM MSE | 0.026 | 0.016 | 0.026 | **0.039** | 0.027 |
+| LightGBM 4.7 | 0.023 | 0.008 | 0.024 | 0.024 | 0.019 |
+| CatBoost 1.2 | 0.021 | 0.005 | 0.024 | 0.025 | 0.019 |
 
-- `timestamp` required (unless `iid_mode=True`)
-- `horizon` required in time mode
-- `lint_mode="strict"` refuses lookahead features
-- `halo=False` (enable only if you can afford it)
-- `goss=None` auto-enables GOSS at ≥250k rows; set `goss=False` to keep every row
-- `eval_metric="auto"` monitors cross-sectional IC when time or rank is on
-- `max_bin=255`; split structure uses the full train window (`causal_structure=False`, `structure_frac=1`). TORB still prefixes residuals.
-- `n_time_buckets=0` auto: 32 buckets for short horizons, 64 when the label spans ≥8 median time steps
-- `causal_bins=False` (full-train edges); sparse TORB prefixes blend to full leaf values
-- For cross-sectional IC on panels, prefer `objective="pairwise"` (MSE remains `objective="auto"` / `"mse"`)
-- eval set must be strictly in the future
+Tide pairwise beats LightGBM on **all four horizons** on this protocol. LightGBM remains **~5–10× faster** to fit. Three folds, noisy IC — interpret as a sanity check, not a profit guarantee.
 
-## Layout
+Full protocol: [`docs/TIDEBENCH.md`](docs/TIDEBENCH.md)
 
-- `cpp/` — library, C API (`include/tidegbm/c_api.h`), optional `histogram_cuda.cu`
-- `src/tidegbm/` — sklearn wrappers
-- `benchmarks/markets.py` — 30 public names vs LightGBM/CatBoost
-- `benchmarks/tidebench.py` — synthetic multi-panel protocol
-- `benchmarks/bench_scale.py` — 100k-row CPU histogram smoke
-- `docs/TIDEBENCH.md` — stand protocol
-- `docs/DESIGN.md` — algorithm RFC
-- `docs/LEAKAGE.md` — anti-examples
-- `docs/COMPATIBILITY.md` — semver / model format
+---
 
-Apache-2.0
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Input
+        X["Features X"]
+        y["Target y"]
+        ts["timestamp"]
+        ent["entity"]
+    end
+
+    subgraph TideGBM
+        lint["Leak lint"]
+        bin["Histogram binner"]
+        torb["TORB residuals"]
+        boost["GBDT ensemble"]
+    end
+
+    subgraph Output
+        pred["predict()"]
+        model["TGBM / ONNX"]
+    end
+
+    X --> lint --> bin --> torb --> boost --> pred
+    y --> boost
+    ts --> torb
+    ent --> torb
+    boost --> model
+```
+
+---
+
+## Production defaults
+
+- `timestamp` required (unless `iid_mode=True`); `horizon` required in time mode
+- `lint_mode="strict"` — refuses lookahead features
+- `eval_metric="auto"` — cross-sectional IC when time or rank mode is on
+- `max_bin=255`; full-train split structure (`causal_structure=False`)
+- `n_time_buckets=0` — auto 32/64 buckets from label horizon
+- `goss=None` — auto GOSS at ≥250k rows
+- Eval set must be **strictly in the future**
+
+---
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [`docs/DESIGN.md`](docs/DESIGN.md) | Algorithm design & TORB RFC |
+| [`docs/TIDEBENCH.md`](docs/TIDEBENCH.md) | Benchmark protocol & quality search |
+| [`docs/LEAKAGE.md`](docs/LEAKAGE.md) | Leakage anti-patterns |
+| [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) | Semver & model format |
+| [`docs/PUBLISH.md`](docs/PUBLISH.md) | GitHub publish guide |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release history |
+
+---
+
+## Project layout
+
+```
+cpp/                  C++ core, C API, optional CUDA histograms
+src/tidegbm/          Python sklearn wrappers
+benchmarks/           markets.py, tidebench.py, bench_scale.py
+tests/                pytest suite (39 tests)
+.github/workflows/    CI, wheel builds, GPU wheel pipeline
+```
+
+---
+
+## License
+
+Apache-2.0 — see [`LICENSE`](LICENSE).
+
+---
+
+<br>
+
+## Русский
+
+<div align="center">
+
+### TideGBM — градиентный бустинг для временных панелей и рынков
+
+</div>
+
+**TideGBM** — библиотека градиентного бустинга на **C++** с Python-обёрткой в стиле sklearn. Создана для таблиц с **временной структурой** и **поперечным сечением** (много инструментов / сущностей на одну дату): количественные финансы, спрос, мульти-объектная аналитика.
+
+Вы приносите `X` и `y`. Библиотека **не строит индикаторы** — она учитывает **порядок времени**, **структуру панели** и **честную purged-оценку** как часть алгоритма.
+
+#### Ключевые возможности
+
+| | |
+|---|---|
+| **TORB** | Временно-упорядоченные остатки — каузальная структура сплитов и листьев |
+| **Purge / embargo** | Walk-forward с зазором по горизонту — защита от утечки меток |
+| **Leak lint** | Строгий режим отклоняет признаки с lookahead |
+| **`objective="pairwise"`** | Ранжирование внутри даты для cross-sectional IC |
+| **Движок** | Гистограммы column-major, OpenMP; опционально CUDA |
+
+#### Быстрый старт
+
+```python
+from tidegbm import TideRegressor
+
+model = TideRegressor(horizon=1, n_estimators=200, max_depth=6, objective="pairwise")
+model.fit(X, y, timestamp="ts", entity="symbol")
+pred = model.predict(X_live)
+```
+
+Для **уровневой регрессии** (R², абсолютная ошибка) — `objective="mse"`.
+
+#### Установка
+
+```bash
+git clone https://github.com/Vizanix/TideGBM.git && cd TideGBM
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]" && pytest
+```
+
+Нужны: компилятор C++17, OpenMP. Бенчмарки: `pip install -e ".[bench]"`.
+
+#### Бенчмарк (30 публичных тикеров, Yahoo)
+
+Purged walk-forward, метки **центрированы по дате**. Лучший рецепт: depth 6, `objective="pairwise"`.
+
+| Модель | h=1 | h=3 | h=5 | h=10 | **Ср. IC** |
+|---|---:|---:|---:|---:|---:|
+| **TideGBM pairwise** | **0.026** | **0.020** | **0.050** | 0.027 | **0.031** |
+| LightGBM | 0.023 | 0.008 | 0.024 | 0.024 | 0.019 |
+
+Tide pairwise обходит LightGBM на **всех четырёх горизонтах** в этом протоколе. LightGBM по-прежнему **в 5–10 раз быстреe** на fit. IC ~0.03 — слабый сигнал; это не гарантия прибыли.
+
+Подробности: [`docs/TIDEBENCH.md`](docs/TIDEBENCH.md) (на английском).
+
+#### Документация
+
+| Файл | О чём |
+|---|---|
+| [`docs/DESIGN.md`](docs/DESIGN.md) | Алгоритм и TORB |
+| [`docs/LEAKAGE.md`](docs/LEAKAGE.md) | Анти-паттерны утечек |
+| [`CHANGELOG.md`](CHANGELOG.md) | История версий |
+
+#### Оговорки
+
+- Не заявляем SOTA и «альфу деска».
+- SHAP-значения — Saabas path attributions (аддитивные), не Independent TreeSHAP.
+- `objective="auto"` остаётся MSE для совместимости с регрессионными тестами; pairwise — для ранжирования / IC.
+
+Лицензия: **Apache-2.0**.
+
+---
+
+<div align="center">
+
+<br>
+
+---
+
+**Built by [Vizanix](https://github.com/Vizanix)** — algorithmic trading systems, signal pipelines & automated software for crypto markets.
+
+Explore our work at **[vizanix.tech](https://vizanix.tech)** · Questions & contributions welcome via [Issues](https://github.com/Vizanix/TideGBM/issues).
+
+</div>

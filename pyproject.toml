@@ -9,7 +9,7 @@ description = "Temporal ordered gradient boosting for panel and market data."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
-authors = [{ name = "TideGBM authors" }]
+authors = [{ name = "Vizanix" }]
 keywords = [
     "gradient-boosting",
     "time-series",
@@ -44,8 +44,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/tidegbm/tidegbm"
-Issues = "https://github.com/tidegbm/tidegbm/issues"
+Homepage = "https://github.com/Vizanix/TideGBM"
+Documentation = "https://github.com/Vizanix/TideGBM#readme"
+Repository = "https://github.com/Vizanix/TideGBM"
+Issues = "https://github.com/Vizanix/TideGBM/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
