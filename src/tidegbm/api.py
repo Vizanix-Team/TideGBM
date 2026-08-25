@@ -26,6 +26,15 @@ def _params(est: "TideEstimator") -> dict:
 
 
 class TideEstimator(BaseEstimator):
+    """Base gradient boosting estimator (histogram GBDT + TORB).
+
+    Use :class:`TideRegressor`, :class:`TideClassifier`, or :class:`TideRanker`
+    instead of instantiating this class directly.
+
+    See the API reference for the full parameter list and ``fit()`` kwargs:
+    https://github.com/Vizanix/TideGBM/blob/main/docs/API.md
+    """
+
     def __init__(
         self,
         n_estimators: int = 100,
@@ -290,14 +299,31 @@ class TideEstimator(BaseEstimator):
 
 
 class TideRegressor(TideEstimator, RegressorMixin):
-    """Gradient boosting regressor with temporal ordered residuals."""
+    """Gradient boosting regressor with temporal ordered residuals (TORB).
+
+    Parameters
+    ----------
+    n_estimators, learning_rate, max_depth, ...
+        See ``TideEstimator`` and ``docs/API.md`` on GitHub.
+
+    Examples
+    --------
+    >>> from tidegbm import TideRegressor
+    >>> model = TideRegressor(horizon=1, objective="pairwise")
+    >>> model.fit(X, y, timestamp="ts", entity="symbol")
+    >>> model.predict(X_new)
+    """
 
     def _task(self) -> str:
         return "regressor"
 
 
 class TideClassifier(TideEstimator, ClassifierMixin):
-    """Binary gradient boosting classifier with temporal ordered residuals."""
+    """Binary or multiclass gradient boosting classifier with TORB.
+
+    Binary problems use ``logloss`` when ``objective="auto"``.
+    Multiclass uses ``softmax`` over ``n_classes``.
+    """
 
     def _task(self) -> str:
         return "classifier"
@@ -335,7 +361,11 @@ class TideClassifier(TideEstimator, ClassifierMixin):
 
 
 class TideRanker(TideEstimator, RankerMixin):
-    """Cross-sectional ranker. Groups by timestamp (all entities at time t)."""
+    """Cross-sectional learning-to-rank within timestamp groups.
+
+    Groups are formed by ``timestamp`` (all entities at time *t*).
+    Default objective is ``"rank"`` when ``objective`` is ``"auto"`` or ``"mse"``.
+    """
 
     def _task(self) -> str:
         return "ranker"

@@ -1,4 +1,27 @@
-"""TideGBM: temporal ordered gradient boosting for panel and market data."""
+"""TideGBM: temporal ordered gradient boosting for panel and market data.
+
+Public API
+----------
+TideRegressor, TideClassifier, TideRanker
+    scikit-learn estimators with TORB time/panel inductive bias.
+
+WalkForwardSplit, combinatorial_purged_cv
+    Purged walk-forward and combinatorial CV for time series.
+
+lint, LintReport
+    Leakage checks before training.
+
+TideConfig
+    Hyperparameter dataclass with validation.
+
+calibrate_oof
+    Purged out-of-fold isotonic calibration.
+
+cuda_compiled
+    Whether this wheel was built with CUDA histograms.
+
+Documentation: https://github.com/Vizanix/TideGBM/blob/main/docs/API.md
+"""
 
 from tidegbm._core import cuda_compiled as cuda_compiled
 from tidegbm.api import TideClassifier, TideRanker, TideRegressor

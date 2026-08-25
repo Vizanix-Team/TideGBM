@@ -58,14 +58,20 @@ For **level regression** (R², absolute fit), use `objective="mse"` or `objectiv
 ## Installation
 
 ```bash
+pip install tidegbm
+```
+
+Optional extras: `tidegbm[onnx]`, `tidegbm[bench]`, `tidegbm[dev]`.
+
+**From source** (requires C++17 + OpenMP):
+
+```bash
 git clone https://github.com/Vizanix/TideGBM.git
 cd TideGBM
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
 ```
-
-**Requirements:** C++17 compiler, OpenMP (`g++` on Linux).
 
 | Extra | Purpose |
 |---|---|
@@ -149,6 +155,8 @@ flowchart LR
 
 | Document | Contents |
 |---|---|
+| [**`docs/API.md`**](docs/API.md) | **Python API reference** (estimators, fit params, CV, lint) |
+| [`docs/QUICKSTART.md`](docs/QUICKSTART.md) | Install & first model |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Algorithm design & TORB RFC |
 | [`docs/TIDEBENCH.md`](docs/TIDEBENCH.md) | Benchmark protocol & quality search |
 | [`docs/LEAKAGE.md`](docs/LEAKAGE.md) | Leakage anti-patterns |
@@ -214,12 +222,18 @@ pred = model.predict(X_live)
 #### Установка
 
 ```bash
+pip install tidegbm
+```
+
+Из исходников:
+
+```bash
 git clone https://github.com/Vizanix/TideGBM.git && cd TideGBM
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]" && pytest
 ```
 
-Нужны: компилятор C++17, OpenMP. Бенчмарки: `pip install -e ".[bench]"`.
+Полная документация API: [`docs/API.md`](docs/API.md).
 
 #### Бенчмарк (30 публичных тикеров, Yahoo)
 

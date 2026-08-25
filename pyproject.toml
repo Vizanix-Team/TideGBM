@@ -7,7 +7,8 @@ name = "tidegbm"
 version = "0.4.0"
 description = "Temporal ordered gradient boosting for panel and market data."
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [{ name = "Vizanix" }]
 keywords = [
@@ -20,7 +21,6 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -45,7 +45,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/Vizanix/TideGBM"
-Documentation = "https://github.com/Vizanix/TideGBM#readme"
+Documentation = "https://github.com/Vizanix/TideGBM/blob/main/docs/API.md"
 Repository = "https://github.com/Vizanix/TideGBM"
 Issues = "https://github.com/Vizanix/TideGBM/issues"
 
