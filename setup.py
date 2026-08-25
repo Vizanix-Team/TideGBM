@@ -25,6 +25,22 @@ sources = [
 if sys.platform == "win32":
     compile_args = ["/O2", "/std:c++17", "/EHsc", "/openmp"]
     link_args = []
+elif sys.platform == "darwin":
+    compile_args = ["-O3", "-std=c++17", "-fvisibility=hidden", "-fno-math-errno"]
+    link_args = []
+    libomp = os.environ.get("TIDEGBM_LIBOMP_PREFIX")
+    if not libomp and shutil.which("brew"):
+        try:
+            libomp = subprocess.check_output(["brew", "--prefix", "libomp"], text=True).strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            libomp = None
+    if not libomp:
+        raise RuntimeError(
+            "macOS build requires libomp. Run: brew install libomp "
+            "(cibuildwheel sets this via CIBW_BEFORE_ALL_MACOS)."
+        )
+    compile_args += ["-Xpreprocessor", "-fopenmp", f"-I{libomp}/include"]
+    link_args += [f"-L{libomp}/lib", "-lomp"]
 else:
     compile_args = ["-O3", "-std=c++17", "-fvisibility=hidden", "-ftree-vectorize", "-fno-math-errno"]
     link_args = []

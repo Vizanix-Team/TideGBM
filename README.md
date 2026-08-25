@@ -156,6 +156,7 @@ flowchart LR
 | Document | Contents |
 |---|---|
 | [**`docs/API.md`**](docs/API.md) | **Python API reference** (estimators, fit params, CV, lint) |
+| [`docs/QUICKSTART.md`](docs/QUICKSTART.md) | Install & first model |
 | [`examples/quant_walkthrough.ipynb`](examples/quant_walkthrough.ipynb) | Jupyter walk-through for quants |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Algorithm design & TORB RFC |
 | [`docs/TIDEBENCH.md`](docs/TIDEBENCH.md) | Benchmark protocol & quality search |

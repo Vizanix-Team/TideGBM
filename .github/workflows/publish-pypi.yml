@@ -9,64 +9,25 @@ permissions:
   contents: read
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+  build-wheels:
+    name: wheels-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install cibuildwheel
-      - run: python -m cibuildwheel --output-dir wheelhouse
-        env:
-          CIBW_BUILD: "cp310-* cp311-* cp312-*"
-          CIBW_SKIP: "pp* *-win32 *-manylinux_i686 *-musllinux*"
-          CIBW_BEFORE_BUILD: "pip install pybind11"
-          CIBW_TEST_REQUIRES: "pytest numpy pandas scikit-learn"
-          CIBW_TEST_COMMAND: "pytest {project}/tests -q"
+      - name: Install cibuildwheel
+        run: pip install cibuildwheel
+      - name: Build wheels
+        run: python -m cibuildwheel --output-dir wheelhouse
       - uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux
-          path: wheelhouse/*.whl
-
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install cibuildwheel
-      - run: python -m cibuildwheel --output-dir wheelhouse
-        env:
-          CIBW_BUILD: "cp310-* cp311-* cp312-*"
-          CIBW_SKIP: "pp* *-win32 *-manylinux_i686 *-musllinux*"
-          CIBW_BEFORE_BUILD: "pip install pybind11"
-          CIBW_TEST_REQUIRES: "pytest numpy pandas scikit-learn"
-          CIBW_TEST_COMMAND: "pytest {project}/tests -q"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wheels-macos
-          path: wheelhouse/*.whl
-
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install cibuildwheel
-      - run: python -m cibuildwheel --output-dir wheelhouse
-        env:
-          CIBW_BUILD: "cp310-* cp311-* cp312-*"
-          CIBW_SKIP: "pp* *-win32 *-manylinux_i686 *-musllinux*"
-          CIBW_BEFORE_BUILD: "pip install pybind11"
-          CIBW_TEST_REQUIRES: "pytest numpy pandas scikit-learn"
-          CIBW_TEST_COMMAND: "pytest {project}/tests -q"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wheels-windows
+          name: wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
 
   build-sdist:
@@ -84,7 +45,7 @@ jobs:
           path: dist/*.tar.gz
 
   publish:
-    needs: [build-linux, build-macos, build-windows, build-sdist]
+    needs: [build-wheels, build-sdist]
     runs-on: ubuntu-latest
     environment: pypi
     steps:
