@@ -1,0 +1,38 @@
+name: gpu-wheel
+
+# Compiles a CUDA wheel. No GPU is required on the runner — only nvcc.
+# The artifact runs device="gpu" on a machine with a CUDA driver.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  cuda:
+    name: linux-cu12
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: CUDA toolkit
+        uses: Jimver/cuda-toolkit@v0.2.24
+        id: cuda
+        with:
+          cuda: "12.4.1"
+          method: network
+          sub-packages: '["nvcc"]'
+      - name: Build GPU wheel
+        env:
+          TIDEGBM_CUDA: "1"
+          CUDA_HOME: ${{ steps.cuda.outputs.CUDA_HOME }}
+        run: |
+          python -m pip install -U pip pybind11 wheel
+          python -m pip wheel . -w wheelhouse --no-deps
+          ls -lh wheelhouse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tidegbm-cu12-linux
+          path: wheelhouse/tidegbm*.whl
