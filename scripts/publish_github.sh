@@ -3,7 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-REMOTE="${REMOTE:-git@github.com:Vizanix/TideGBM.git}"
+REMOTE="${REMOTE:-git@github-vizanix:Vizanix/TideGBM.git}"
 BRANCH="${BRANCH:-main}"
 
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then

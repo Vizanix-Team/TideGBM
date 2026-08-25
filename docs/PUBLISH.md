@@ -3,21 +3,28 @@
 Локально уже есть `main` с первым коммитом. Remote:
 
 ```text
-git@github.com:Vizanix/TideGBM.git
+git@github-vizanix:Vizanix/TideGBM.git
 ```
 
 ## 1. SSH-ключ на аккаунте Vizanix
 
-На этой машине push идёт через ключ, который GitHub видит как **Kalashnkv**.
-Чтобы пушить в **Vizanix/TideGBM**, добавь тот же публичный ключ:
+GitHub **не даёт один ключ двум аккаунтам**. Старый `id_rsa` уже на **Kalashnkv** → ошибка *Key is already in use*.
 
-GitHub → **Vizanix** → Settings → SSH and GPG keys → New SSH key  
-(или добавь Kalashnkv как collaborator в репозиторий с правом Write.)
-
-Публичный ключ с машины сборки:
+**Вариант A (рекомендуется):** отдельный ключ для Vizanix (уже сгенерирован на машине сборки):
 
 ```bash
-cat ~/.ssh/id_rsa.pub
+cat ~/.ssh/id_ed25519_vizanix.pub
+```
+
+GitHub → **Vizanix** → Settings → SSH and GPG keys → New SSH key → вставь этот ключ.
+
+Remote использует alias `github-vizanix` (см. `~/.ssh/config`), чтобы не путать с Kalashnkv.
+
+**Вариант B:** не добавлять ключ на Vizanix — создай репо от Vizanix, добавь **Kalashnkv** collaborator (Write), пушь старым ключом:
+
+```bash
+git remote set-url origin git@github.com:Vizanix/TideGBM.git
+git push -u origin main
 ```
 
 ## 2. Создай пустой репозиторий
