@@ -153,7 +153,6 @@ flowchart LR
 | [`docs/TIDEBENCH.md`](docs/TIDEBENCH.md) | Benchmark protocol & quality search |
 | [`docs/LEAKAGE.md`](docs/LEAKAGE.md) | Leakage anti-patterns |
 | [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) | Semver & model format |
-| [`docs/PUBLISH.md`](docs/PUBLISH.md) | GitHub publish guide |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history |
 
 ---
