@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
 
 Hot-path rewrite. Every change below is semantics-preserving: fold ICs on the market stand
 are identical to 0.4.0 to five decimals, and the 39 existing tests pass unchanged.

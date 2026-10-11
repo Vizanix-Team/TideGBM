@@ -31,7 +31,7 @@ from tidegbm.cv import WalkForwardSplit, combinatorial_purged_cv
 from tidegbm.lint import LintReport, lint
 from tidegbm.uniqueness import average_uniqueness, uniqueness_weights
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 __all__ = [
     "TideRegressor",
     "TideClassifier",

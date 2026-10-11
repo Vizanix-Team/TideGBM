@@ -417,7 +417,7 @@ pip install tidegbm[dev]     # pytest, ruff, coverage
 ```python
 import tidegbm
 
-tidegbm.__version__      # "0.4.0"
+tidegbm.__version__      # "0.5.0"
 tidegbm.cuda_compiled    # True if GPU histograms were compiled in
 ```
 
