@@ -4,7 +4,7 @@
 
 **Temporal Ordered Gradient Boosting for panel & market data**
 
-[![CI](https://github.com/Vizanix/TideGBM/actions/workflows/ci.yml/badge.svg)](https://github.com/Vizanix/TideGBM/actions/workflows/ci.yml)
+[![CI](https://github.com/Vizanix-Team/TideGBM/actions/workflows/ci.yml/badge.svg)](https://github.com/Vizanix-Team/TideGBM/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/tidegbm.svg)](https://pypi.org/project/tidegbm/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
@@ -66,7 +66,7 @@ Optional extras: `tidegbm[onnx]`, `tidegbm[bench]`, `tidegbm[dev]`.
 **From source** (requires C++17 + OpenMP):
 
 ```bash
-git clone https://github.com/Vizanix/TideGBM.git
+git clone https://github.com/Vizanix-Team/TideGBM.git
 cd TideGBM
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
@@ -229,7 +229,7 @@ pip install tidegbm
 Из исходников:
 
 ```bash
-git clone https://github.com/Vizanix/TideGBM.git && cd TideGBM
+git clone https://github.com/Vizanix-Team/TideGBM.git && cd TideGBM
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]" && pytest
 ```
@@ -275,6 +275,6 @@ Tide pairwise обходит LightGBM на **всех четырёх гориз�
 
 **Built by [Vizanix](https://github.com/Vizanix)** — algorithmic trading systems, signal pipelines & automated software for crypto markets.
 
-Explore our work at **[vizanix.tech](https://vizanix.tech)** · Questions & contributions welcome via [Issues](https://github.com/Vizanix/TideGBM/issues).
+Explore our work at **[vizanix.tech](https://vizanix.tech)** · Questions & contributions welcome via [Issues](https://github.com/Vizanix-Team/TideGBM/issues).
 
 </div>

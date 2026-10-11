@@ -20,7 +20,7 @@ calibrate_oof
 cuda_compiled
     Whether this wheel was built with CUDA histograms.
 
-Documentation: https://github.com/Vizanix/TideGBM/blob/main/docs/API.md
+Documentation: https://github.com/Vizanix-Team/TideGBM/blob/main/docs/API.md
 """
 
 from tidegbm._core import cuda_compiled as cuda_compiled

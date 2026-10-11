@@ -9,7 +9,7 @@ pip install tidegbm
 Development install:
 
 ```bash
-git clone https://github.com/Vizanix/TideGBM.git && cd TideGBM
+git clone https://github.com/Vizanix-Team/TideGBM.git && cd TideGBM
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest

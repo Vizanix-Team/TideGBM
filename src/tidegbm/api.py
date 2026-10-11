@@ -32,7 +32,7 @@ class TideEstimator(BaseEstimator):
     instead of instantiating this class directly.
 
     See the API reference for the full parameter list and ``fit()`` kwargs:
-    https://github.com/Vizanix/TideGBM/blob/main/docs/API.md
+    https://github.com/Vizanix-Team/TideGBM/blob/main/docs/API.md
     """
 
     def __init__(

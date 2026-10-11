@@ -44,10 +44,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Vizanix/TideGBM"
-Documentation = "https://github.com/Vizanix/TideGBM/blob/main/docs/API.md"
-Repository = "https://github.com/Vizanix/TideGBM"
-Issues = "https://github.com/Vizanix/TideGBM/issues"
+Homepage = "https://github.com/Vizanix-Team/TideGBM"
+Documentation = "https://github.com/Vizanix-Team/TideGBM/blob/main/docs/API.md"
+Repository = "https://github.com/Vizanix-Team/TideGBM"
+Issues = "https://github.com/Vizanix-Team/TideGBM/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
