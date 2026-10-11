@@ -6,6 +6,10 @@
 #include <random>
 #include <unordered_map>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 namespace tidegbm {
 
 int apply_one(const Tree& t, const u16* row, int n_features, int n_bins) {
@@ -223,31 +227,54 @@ static SplitCand best_for_leaf(const u16* xb_row, const u16* xb_col, int n_rows,
             for (int a = 0; a < k; ++a)
                 for (int b = a + 1; b < k; ++b) pairs.emplace_back(top[a], top[b]);
         }
-        std::vector<u16> z(n_idx);
-        std::vector<i32> loc(n_idx);
-        std::iota(loc.begin(), loc.end(), 0);
         std::vector<f64> gL(n_idx), hL(n_idx);
         for (int i = 0; i < n_idx; ++i) {
             gL[i] = g[idx[i]];
             hL[i] = h[idx[i]];
         }
-        Hist hz;
-        hz.resize(1, n_bins);
-        for (auto [f1, f2] : pairs) {
+        const int n_pairs = static_cast<int>(pairs.size());
+        std::vector<SplitCand> pair_best(n_pairs);
+#ifdef _OPENMP
+        const int n_scratch = std::max(1, omp_get_max_threads());
+#else
+        const int n_scratch = 1;
+#endif
+        std::vector<Hist> pair_scratch(n_scratch);
+        // Hashing the pair bin and accumulating it are fused into one pass over the leaf
+        // (was: materialise z, then re-read it to build the histogram). Bins are visited in
+        // the same order, so the resulting candidate is bit-identical to the two-pass form.
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic) if (n_pairs > 1 && cfg.n_jobs != 1)
+#endif
+        for (int pi = 0; pi < n_pairs; ++pi) {
+            const int f1 = pairs[pi].first, f2 = pairs[pi].second;
             if (f1 < 0 || f2 < 0 || f1 >= n_features || f2 >= n_features || f1 == f2) continue;
+#ifdef _OPENMP
+            const int slot = std::min(omp_get_thread_num(), n_scratch - 1);
+#else
+            const int slot = 0;
+#endif
+            Hist& hz = pair_scratch[slot];
+            if (hz.n_bins != n_bins || hz.n_features != 1) hz.resize(1, n_bins);
+            hz.zero();  // resize allocates only; this loop accumulates, so it must start clean
+            HBin* HB = hz.B.data();
             for (int i = 0; i < n_idx; ++i) {
                 const u16* row = xb_row + static_cast<size_t>(idx[i]) * n_features;
-                z[i] = pair_bin(row[f1], row[f2], n_bins);
+                const u16 b = pair_bin(row[f1], row[f2], n_bins);
+                HB[b].g += gL[i];
+                HB[b].h += hL[i];
+                HB[b].c += 1;
             }
-            build_hist(z.data(), 1, loc.data(), n_idx, gL.data(), hL.data(), hz, 1);
             auto cand = best_numeric_missing(hz, 0, cfg.pair_l2, cfg.min_split_gain,
                                              cfg.min_samples_leaf, cfg.min_child_weight, 0, cfg.l1);
-            if (cand.gain > best.gain) {
-                cand.type = SplitType::Pair;
-                cand.feature = f1;
-                cand.feature2 = f2;
-                best = cand;
-            }
+            cand.type = SplitType::Pair;
+            cand.feature = f1;
+            cand.feature2 = f2;
+            pair_best[pi] = cand;
+        }
+        for (int pi = 0; pi < n_pairs; ++pi) {
+            if (pair_best[pi].feature2 < 0) continue;  // skipped or no valid split
+            if (pair_best[pi].gain > best.gain) best = pair_best[pi];
         }
     }
     return best;
@@ -388,17 +415,23 @@ Tree grow_tree(const u16* xb_row, const u16* xb_col, int n_rows, const f64* g, c
         fill_val(left, L);
         fill_val(right, R);
 
+        // Build only the smaller child, then turn the parent's own buffer into the larger one
+        // by subtracting in place: one histogram allocation per split instead of three.
         Hist hL, hR;
-        hL.resize(n_features, n_bins);
-        hR.resize(n_features, n_bins);
-        if (L.size() <= R.size()) {
-            fill_hist(cfg, xb_row, xb_col, n_rows, n_features, n_bins, L.data(),
-                      static_cast<int>(L.size()), g, h, hL);
-            subtract_hist(leaf_hist[best_leaf], hL, hR);
+        Hist parent_hist = std::move(leaf_hist[best_leaf]);
+        Hist small;
+        const bool left_is_small = L.size() <= R.size();
+        const std::vector<i32>& small_ix = left_is_small ? L : R;
+        small.resize(n_features, n_bins);
+        fill_hist(cfg, xb_row, xb_col, n_rows, n_features, n_bins, small_ix.data(),
+                  static_cast<int>(small_ix.size()), g, h, small);
+        subtract_hist_inplace(parent_hist, small);
+        if (left_is_small) {
+            hL = std::move(small);
+            hR = std::move(parent_hist);
         } else {
-            fill_hist(cfg, xb_row, xb_col, n_rows, n_features, n_bins, R.data(),
-                      static_cast<int>(R.size()), g, h, hR);
-            subtract_hist(leaf_hist[best_leaf], hR, hL);
+            hR = std::move(small);
+            hL = std::move(parent_hist);
         }
         leaf_hist[best_leaf] = Hist();
 

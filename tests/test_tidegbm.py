@@ -517,3 +517,55 @@ def test_onnx_protobuf(tmp_path):
     model = onnx.load(str(path))
     assert model.graph.node[0].op_type == "TreeEnsembleRegressor"
     assert path.stat().st_size > 32
+
+
+def test_uniqueness_no_overlap_is_one():
+    from tidegbm import average_uniqueness
+
+    ts = np.arange(20)
+    assert np.allclose(average_uniqueness(ts, 1), 1.0)
+
+
+def test_uniqueness_matches_concurrency():
+    from tidegbm import average_uniqueness
+
+    # A label spanning h steps on a dense daily grid overlaps h-1 neighbours, so in the
+    # steady state each observation is worth 1/h of an independent sample.
+    ts = np.arange(60)
+    u = average_uniqueness(ts, 5)
+    assert np.allclose(u[10:], 0.2, atol=1e-9)
+    assert u[0] > u[1] > u[2]  # the first labels overlap fewer predecessors
+
+
+def test_uniqueness_is_per_entity():
+    from tidegbm import average_uniqueness
+
+    ts_single = np.arange(30)
+    solo = average_uniqueness(ts_single, 5)
+    ts_panel = np.repeat(np.arange(30), 3)
+    ent = np.tile([0, 1, 2], 30)
+    panel = average_uniqueness(ts_panel, 5, ent)
+    # Entities must not inflate each other's concurrency.
+    for e in (0, 1, 2):
+        assert np.allclose(panel[ent == e], solo)
+
+
+def test_uniqueness_weight_changes_fit():
+    df = _panel(n_time=150, n_ent=6)
+    X, y = df[["x0", "x1"]], df["y"]
+    kw = dict(n_estimators=25, horizon=5, random_state=0, verbose=0, lint_mode="off")
+    base = TideRegressor(**kw).fit(X, y, timestamp=df["ts"], entity=df["symbol"])
+    weighted = TideRegressor(uniqueness_weight=True, **kw).fit(
+        X, y, timestamp=df["ts"], entity=df["symbol"]
+    )
+    assert not np.allclose(base.predict(X), weighted.predict(X))
+
+
+def test_rank_loss_is_not_squared_error():
+    df = _panel(n_time=120, n_ent=10)
+    model = TideRanker(n_estimators=20, horizon=1, random_state=0, verbose=0, lint_mode="off")
+    model.fit(df[["x0", "x1"]], df["y"], timestamp=df["ts"], entity=df["symbol"])
+    curve = model.evals_result_["train"]
+    # Ranking reports negative mean within-date correlation, so a fitting model goes
+    # negative -- a squared-error fallback could never do that.
+    assert min(curve) < 0.0

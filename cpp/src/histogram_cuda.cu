@@ -148,10 +148,22 @@ void build_hist_gpu(const u16* xb, int n_features, const i32* idx, int n_idx, co
                                         st.d_G, st.d_H, st.d_C);
     check_cuda(cudaGetLastError(), "hist kernel launch");
     check_cuda(cudaDeviceSynchronize(), "hist kernel");
-    check_cuda(cudaMemcpy(out.G.data(), st.d_G, hist_sz * sizeof(f64), cudaMemcpyDeviceToHost), "D2H G");
-    check_cuda(cudaMemcpy(out.H.data(), st.d_H, hist_sz * sizeof(f64), cudaMemcpyDeviceToHost), "D2H H");
-    check_cuda(cudaMemcpy(out.C.data(), st.d_C, hist_sz * sizeof(long long), cudaMemcpyDeviceToHost),
+    // Device keeps three flat planes; the host histogram is interleaved, so fold on copy-back.
+    static thread_local std::vector<f64> hG, hH;
+    static thread_local std::vector<long long> hC;
+    hG.resize(hist_sz);
+    hH.resize(hist_sz);
+    hC.resize(hist_sz);
+    check_cuda(cudaMemcpy(hG.data(), st.d_G, hist_sz * sizeof(f64), cudaMemcpyDeviceToHost), "D2H G");
+    check_cuda(cudaMemcpy(hH.data(), st.d_H, hist_sz * sizeof(f64), cudaMemcpyDeviceToHost), "D2H H");
+    check_cuda(cudaMemcpy(hC.data(), st.d_C, hist_sz * sizeof(long long), cudaMemcpyDeviceToHost),
                "D2H C");
+    HBin* B = out.B.data();
+    for (size_t i = 0; i < hist_sz; ++i) {
+        B[i].g = hG[i];
+        B[i].h = hH[i];
+        B[i].c = static_cast<i64>(hC[i]);
+    }
 }
 
 }  // namespace tidegbm

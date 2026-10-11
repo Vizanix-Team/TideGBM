@@ -102,6 +102,7 @@ class TideEstimator(BaseEstimator):
         bin_sample: int = 262144,
         entity_subsample: float = 1.0,
         eval_metric: str = "auto",
+        uniqueness_weight: bool = False,
     ) -> None:
         self.n_estimators = n_estimators
         self.learning_rate = learning_rate
@@ -168,6 +169,7 @@ class TideEstimator(BaseEstimator):
         self.bin_sample = bin_sample
         self.entity_subsample = entity_subsample
         self.eval_metric = eval_metric
+        self.uniqueness_weight = uniqueness_weight
         self._booster: NativeBooster | None = None
         self._calibrator = None
 

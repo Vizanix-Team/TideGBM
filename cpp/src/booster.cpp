@@ -330,6 +330,39 @@ void Booster::fit(const f64* X, const f64* y, int n, int n_f, const i64* timesta
     }
     n_time_buckets = n_buckets;
 
+    // TORB prefix bounds. Rows are sorted by timestamp above, and time_buckets assigns
+    // buckets by time rank, so bucket b owns a contiguous row range and its causal past
+    // {i : ts[i] < t0_b - embargo} is exactly the prefix [0, cut_b). Precomputing the cuts
+    // once turns the per-tree O(n_buckets * n) rescan into a single O(n) pass.
+    std::vector<int> cut_of_bucket(n_buckets, 0);
+    bool torb_fast = false;
+    if (!cfg.iid_mode && n > 0) {
+        bool sorted = true;
+        for (int i = 1; i < n; ++i)
+            if (tsp[i] < tsp[i - 1]) {
+                sorted = false;
+                break;
+            }
+        if (sorted) {
+            torb_fast = true;
+            std::vector<int> first(n_buckets, -1);
+            for (int i = 0; i < n; ++i) {
+                const i32 b = buckets[i];
+                if (b >= 0 && b < n_buckets && first[b] < 0) first[b] = i;
+            }
+            int run = 0;
+            for (int b = 0; b < n_buckets; ++b) {
+                int cut = 0;
+                if (first[b] >= 0) {
+                    const i64 lim = tsp[first[b]] - embargo;
+                    cut = static_cast<int>(std::lower_bound(tsp, tsp + n, lim) - tsp);
+                }
+                run = std::max(run, cut);  // cuts are non-decreasing in b
+                cut_of_bucket[b] = run;
+            }
+        }
+    }
+
     std::vector<u8> bin_mask(n, 1);
     // Default: edges from the full purged train window (still causal vs the test fold).
     // Optional HAB-C holdout of the newest half is usually harmful in walk-forward.
@@ -388,6 +421,12 @@ void Booster::fit(const f64* X, const f64* y, int n, int n_f, const i64* timesta
         }
     } else {
         for (int b = 0; b < n_buckets; ++b) {
+            if (torb_fast) {
+                // Causal past is the contiguous prefix [0, cut) — score it in place, no copy.
+                const int cut = cut_of_bucket[b];
+                init_prefix[b] = cut > 0 ? obj.init_score(yp, w.data(), cut) : std::nan("");
+                continue;
+            }
             std::vector<f64> ys, ws;
             i64 t0 = 0;
             bool any = false;
@@ -570,17 +609,33 @@ void Booster::fit(const f64* X, const f64* y, int n, int n_f, const i64* timesta
             const f64 min_cover = cfg.torb_min_cover > 0.0
                                      ? cfg.torb_min_cover
                                      : static_cast<f64>(2 * std::max(cfg.min_samples_leaf, 1));
+            // Cuts are non-decreasing, so one sweep over the rows in time order fills every
+            // bucket: carry running per-node sums and snapshot them at each cut. Accumulation
+            // order matches the old per-bucket scan, so leaf values are bit-identical.
+            std::vector<f64> pG(nn, 0), pH(nn, 0);
+            int swept = 0;
             for (int b = 0; b < n_buckets; ++b) {
-                std::vector<char> allowed;
-                prefix_mask(b, allowed);
-                std::vector<f64> pG(nn, 0), pH(nn, 0);
-                f64 cover = 0.0;
-                for (int i = 0; i < n; ++i)
-                    if (allowed[i]) {
-                        pG[nid[i]] += gptr[i];
-                        pH[nid[i]] += hptr[i];
-                        cover += 1.0;
+                f64 cover;
+                if (torb_fast) {
+                    const int cut = cut_of_bucket[b];
+                    for (; swept < cut; ++swept) {
+                        pG[nid[swept]] += gptr[swept];
+                        pH[nid[swept]] += hptr[swept];
                     }
+                    cover = static_cast<f64>(cut);
+                } else {
+                    std::vector<char> allowed;
+                    prefix_mask(b, allowed);
+                    std::fill(pG.begin(), pG.end(), 0.0);
+                    std::fill(pH.begin(), pH.end(), 0.0);
+                    cover = 0.0;
+                    for (int i = 0; i < n; ++i)
+                        if (allowed[i]) {
+                            pG[nid[i]] += gptr[i];
+                            pH[nid[i]] += hptr[i];
+                            cover += 1.0;
+                        }
+                }
                 // Sparse causal past → blend toward full-train leaf (avoids zeroed early buckets).
                 const f64 alpha = cover <= 0.0 ? 0.0 : std::min(1.0, cover / std::max(min_cover, 1.0));
                 for (int k = 0; k < nn; ++k) {

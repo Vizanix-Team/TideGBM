@@ -30,15 +30,13 @@ void build_hist(const u16* xb, int n_features, const i32* idx, int n_idx, const 
 #pragma omp parallel for schedule(static) num_threads(nth) if (n_features > 1 && nth > 1)
 #endif
     for (int f = 0; f < n_features; ++f) {
-        f64* G = &out.G[static_cast<size_t>(f) * out.n_bins];
-        f64* H = &out.H[static_cast<size_t>(f) * out.n_bins];
-        i64* C = &out.C[static_cast<size_t>(f) * out.n_bins];
+        HBin* B = out.row(f);
         for (int k = 0; k < n_idx; ++k) {
             const i32 i = idx[k];
             const u16 b = xb[static_cast<size_t>(i) * n_features + f];
-            G[b] += g[i];
-            H[b] += h[i];
-            C[b] += 1;
+            B[b].g += g[i];
+            B[b].h += h[i];
+            B[b].c += 1;
         }
     }
 }
@@ -53,9 +51,7 @@ void build_hist_col(const u16* xcol, int n_rows, int n_features, const i32* idx,
 #endif
     for (int f = 0; f < n_features; ++f) {
         const u16* col = xcol + static_cast<size_t>(f) * n_rows;
-        f64* G = &out.G[static_cast<size_t>(f) * out.n_bins];
-        f64* H = &out.H[static_cast<size_t>(f) * out.n_bins];
-        i64* C = &out.C[static_cast<size_t>(f) * out.n_bins];
+        HBin* B = out.row(f);
         int k = 0;
         for (; k + 8 < n_idx; ++k) {
 #if defined(__GNUC__)
@@ -65,16 +61,16 @@ void build_hist_col(const u16* xcol, int n_rows, int n_features, const i32* idx,
 #endif
             const i32 i = idx[k];
             const u16 b = col[i];
-            G[b] += g[i];
-            H[b] += h[i];
-            C[b] += 1;
+            B[b].g += g[i];
+            B[b].h += h[i];
+            B[b].c += 1;
         }
         for (; k < n_idx; ++k) {
             const i32 i = idx[k];
             const u16 b = col[i];
-            G[b] += g[i];
-            H[b] += h[i];
-            C[b] += 1;
+            B[b].g += g[i];
+            B[b].h += h[i];
+            B[b].c += 1;
         }
     }
 }
@@ -98,11 +94,25 @@ void build_hist_gpu(const u16*, int, const i32*, int, const f64*, const f64*, Hi
 
 void subtract_hist(const Hist& parent, const Hist& child, Hist& other) {
     other.resize(parent.n_features, parent.n_bins);
-    const size_t n = parent.G.size();
+    const size_t n = parent.B.size();
+    const HBin* p = parent.B.data();
+    const HBin* c = child.B.data();
+    HBin* o = other.B.data();
     for (size_t i = 0; i < n; ++i) {
-        other.G[i] = parent.G[i] - child.G[i];
-        other.H[i] = parent.H[i] - child.H[i];
-        other.C[i] = parent.C[i] - child.C[i];
+        o[i].g = p[i].g - c[i].g;
+        o[i].h = p[i].h - c[i].h;
+        o[i].c = p[i].c - c[i].c;
+    }
+}
+
+void subtract_hist_inplace(Hist& parent, const Hist& child) {
+    const size_t n = parent.B.size();
+    HBin* p = parent.B.data();
+    const HBin* c = child.B.data();
+    for (size_t i = 0; i < n; ++i) {
+        p[i].g -= c[i].g;
+        p[i].h -= c[i].h;
+        p[i].c -= c[i].c;
     }
 }
 

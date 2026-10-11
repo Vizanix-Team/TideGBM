@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased
+
+Hot-path rewrite. Every change below is semantics-preserving: fold ICs on the market stand
+are identical to 0.4.0 to five decimals, and the 39 existing tests pass unchanged.
+
+### Speed
+
+- **TORB prefixes no longer rescan the data per bucket.** Rows are sorted by timestamp, so a
+  bucket's causal past is the contiguous prefix `[0, cut_b)`. The cuts are precomputed once
+  per fit and the per-tree loop became a single sweep with running per-node sums, replacing
+  `O(n_buckets * n)` with `O(n + n_buckets * nodes)`. Accumulation order is unchanged, so leaf
+  values are bit-identical.
+- **Rank objectives stopped rebuilding a hash map every iteration.** Timestamp groups are
+  contiguous after the sort, so group boundaries come from one scan; unsorted input falls back
+  to a single stable sort. The per-group loop is now parallel — groups own disjoint rows.
+- **PAIR split evaluation fused and parallelised.** Hashing the pair bin and accumulating it
+  are one pass instead of two, scratch histograms are reused per thread, and candidate pairs
+  are evaluated in parallel.
+- **Histogram bins are interleaved.** Gradient, hessian and count for a bin now live together,
+  turning three cache streams into one in both the accumulate loop and the split scan.
+- **Histograms are zeroed once, not three times.** `resize` allocated *and* zeroed, then
+  `fill_hist` resized again, then `build_hist` zeroed again. `resize` now only allocates.
+- **One histogram allocation per split instead of three.** Only the smaller child is built;
+  the parent's own buffer is subtracted in place to become the larger child.
+
+### Quality
+
+- `uniqueness_weight=True` (default off): weight each row by the average uniqueness of its
+  label, following Lopez de Prado. An `h`-step label sampled every step overlaps its `h-1`
+  neighbours, so overlapping rows are not independent observations — purge and embargo fix the
+  evaluation, not the training set. Concurrency is counted per entity. Exposed directly as
+  `average_uniqueness` and `uniqueness_weights`.
+  On the 30-name market stand the effect is not measurable (see `docs/TIDEBENCH.md`): exactly
+  zero at `horizon=1` where labels do not overlap, and within noise at h=5 and h=10. It is
+  shipped opt-in for that reason.
+- **Ranking objectives report a ranking loss.** `evals_result_["train"]` returned squared error
+  for `rank`/`pairwise`, which is meaningless for a ranking fit. It now reports negative mean
+  within-group correlation.
+
 ## 0.4.0
 
 Speed and quality on the C++ trainer; remaining packaging holes.

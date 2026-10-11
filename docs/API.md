@@ -156,6 +156,30 @@ All three estimators accept the same keyword arguments (sklearn `get_params` / `
 | `tail_buffer` | `0.02` | Fraction of newest rows down-weighted |
 | `tree_decay` | `1.0` | Per-tree weight decay |
 | `entity_subsample` | `1.0` | Subsample whole entities, not random rows |
+| `uniqueness_weight` | `False` | Down-weight overlapping labels by average uniqueness |
+
+#### `uniqueness_weight`
+
+An `h`-step label sampled every step overlaps its `h-1` neighbours, so consecutive rows are
+far from independent observations. Purge and embargo keep *evaluation* honest; they do not
+touch the training set, where the booster still counts every overlapping row as a full
+sample. With `uniqueness_weight=True` each row is weighted by the mean of `1 / concurrency`
+over the span its label covers, following Lopez de Prado. Concurrency is counted **per
+entity**, since an instrument's labels overlap its own future labels and not other
+instruments'. Weights are rescaled to mean 1, so `learning_rate` and `n_estimators` keep
+their usual range.
+
+At `horizon=1` there is no overlap and the weights are exactly 1.0 — the option is inert,
+not merely small. It only does work when labels overlap.
+
+The weights are also available directly:
+
+```python
+from tidegbm import average_uniqueness, uniqueness_weights
+
+u = average_uniqueness(timestamp, horizon=5, entity=symbols)   # in (0, 1]
+w = uniqueness_weights(timestamp, horizon=5, entity=symbols)   # rescaled to mean 1
+```
 
 ### Objectives & metrics
 

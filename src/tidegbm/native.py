@@ -101,6 +101,12 @@ class NativeBooster:
                 w = np.ascontiguousarray(w[order])
                 ent_key = np.ascontiguousarray(ent_key[order])
             entity_i64 = ent_key
+            if params.get("uniqueness_weight"):
+                # Overlapping h-step labels are not independent samples; down-weight by how
+                # much of each label's span is not shared with its neighbours.
+                from tidegbm.uniqueness import uniqueness_weights
+
+                w = uniqueness_weights(ts_i64, horizon_u, ent_key, w)
         cw = params.get("class_weight")
         if cw is not None and task == "classifier":
             y_int = y_arr.astype(int)

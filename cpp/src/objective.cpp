@@ -2,10 +2,41 @@
 
 #include <algorithm>
 #include <cmath>
-#include <unordered_map>
+#include <numeric>
+#include <utility>
 #include <vector>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 namespace tidegbm {
+
+/* Rank groups are timestamps, and fit() sorts rows by timestamp, so groups are almost
+ * always contiguous runs. Detecting that avoids rebuilding a hash map of vectors on every
+ * boosting iteration; the unsorted case falls back to one stable sort instead. */
+static void group_runs(const i64* groups, int n, std::vector<int>& idx,
+                       std::vector<std::pair<int, int>>& runs) {
+    idx.resize(n);
+    std::iota(idx.begin(), idx.end(), 0);
+    bool sorted = true;
+    for (int i = 1; i < n; ++i)
+        if (groups[i] < groups[i - 1]) {
+            sorted = false;
+            break;
+        }
+    if (!sorted)
+        std::stable_sort(idx.begin(), idx.end(),
+                         [&](int a, int b) { return groups[a] < groups[b]; });
+    runs.clear();
+    int i = 0;
+    while (i < n) {
+        int j = i + 1;
+        while (j < n && groups[idx[j]] == groups[idx[i]]) ++j;
+        runs.emplace_back(i, j - i);
+        i = j;
+    }
+}
 
 static f64 wavg(const f64* y, const f64* w, int n) {
     f64 sw = 0, sy = 0;
@@ -120,21 +151,25 @@ void Objective::grad_hess(const f64* y, const f64* pred, const f64* w, const i64
         std::fill(g, g + n, 0.0);
         std::fill(h, h + n, 0.0);
         if (!groups) return;
-        std::unordered_map<i64, std::vector<int>> mp;
-        for (int i = 0; i < n; ++i) mp[groups[i]].push_back(i);
-        std::vector<f64> yy, pp, t, p;
-        for (auto& kv : mp) {
-            auto& ix = kv.second;
-            if (ix.size() < 2) continue;
-            yy.resize(ix.size());
-            pp.resize(ix.size());
-            for (size_t k = 0; k < ix.size(); ++k) {
+        std::vector<int> idx;
+        std::vector<std::pair<int, int>> runs;
+        group_runs(groups, n, idx, runs);
+        const int n_runs = static_cast<int>(runs.size());
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic, 8) if (n_runs > 4)
+#endif
+        for (int r = 0; r < n_runs; ++r) {
+            const int* ix = idx.data() + runs[r].first;
+            const int m = runs[r].second;
+            if (m < 2) continue;
+            std::vector<f64> yy(m), pp(m), t, p;
+            for (int k = 0; k < m; ++k) {
                 yy[k] = y[ix[k]];
                 pp[k] = pred[ix[k]];
             }
-            softmax_in(yy.data(), static_cast<int>(yy.size()), rank_temperature, t);
-            softmax_in(pp.data(), static_cast<int>(pp.size()), 1.0, p);
-            for (size_t k = 0; k < ix.size(); ++k) {
+            softmax_in(yy.data(), m, rank_temperature, t);
+            softmax_in(pp.data(), m, 1.0, p);
+            for (int k = 0; k < m; ++k) {
                 g[ix[k]] = wi(ix[k]) * (p[k] - t[k]);
                 h[ix[k]] = wi(ix[k]) * std::max(p[k] * (1 - p[k]), 1e-6);
             }
@@ -145,12 +180,18 @@ void Objective::grad_hess(const f64* y, const f64* pred, const f64* w, const i64
         std::fill(g, g + n, 0.0);
         std::fill(h, h + n, 1e-6);
         if (!groups) return;
-        std::unordered_map<i64, std::vector<int>> mp;
-        for (int i = 0; i < n; ++i) mp[groups[i]].push_back(i);
+        std::vector<int> idx;
+        std::vector<std::pair<int, int>> runs;
+        group_runs(groups, n, idx, runs);
+        const int n_runs = static_cast<int>(runs.size());
         const f64 sigma = 1.0;
-        for (auto& kv : mp) {
-            auto& ix = kv.second;
-            const int m = static_cast<int>(ix.size());
+        // Groups own disjoint row sets, so the accumulations below never race.
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic, 8) if (n_runs > 4)
+#endif
+        for (int r = 0; r < n_runs; ++r) {
+            const int* ix = idx.data() + runs[r].first;
+            const int m = runs[r].second;
             if (m < 2) continue;
             const int step = m > 48 ? std::max(1, m / 24) : 1;
             for (int a = 0; a < m; ++a) {
@@ -246,12 +287,44 @@ f64 Objective::loss(const f64* y, const f64* pred, const f64* w, const i64* grou
         }
         return sw > 0 ? s / sw : 0;
     }
+    if ((kind == ObjectiveKind::RankListNet || kind == ObjectiveKind::RankPairwise) && groups) {
+        // Squared error says nothing about a ranking fit. Report negative mean within-group
+        // correlation instead, so the reported curve still decreases as the fit improves.
+        std::vector<int> idx;
+        std::vector<std::pair<int, int>> runs;
+        group_runs(groups, n, idx, runs);
+        f64 acc = 0;
+        int ng = 0;
+        for (const auto& rn : runs) {
+            const int* ix = idx.data() + rn.first;
+            const int m = rn.second;
+            if (m < 3) continue;
+            f64 my = 0, mp = 0;
+            for (int k = 0; k < m; ++k) {
+                my += y[ix[k]];
+                mp += pred[ix[k]];
+            }
+            my /= m;
+            mp /= m;
+            f64 vy = 0, vp = 0, c = 0;
+            for (int k = 0; k < m; ++k) {
+                const f64 dy = y[ix[k]] - my, dp = pred[ix[k]] - mp;
+                vy += dy * dy;
+                vp += dp * dp;
+                c += dy * dp;
+            }
+            if (vy > 1e-18 && vp > 1e-18) {
+                acc += c / std::sqrt(vy * vp);
+                ng += 1;
+            }
+        }
+        return ng > 0 ? -acc / ng : 0.0;
+    }
     for (int i = 0; i < n; ++i) {
         const f64 d = pred[i] - y[i];
         s += wi(i) * d * d;
         sw += wi(i);
     }
-    (void)groups;
     return sw > 0 ? s / sw : 0;
 }
 
